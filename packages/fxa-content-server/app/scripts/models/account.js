@@ -92,20 +92,12 @@ const Account = Backbone.Model.extend({
   initialize (accountData, options = {}) {
     this._oAuthClientId = options.oAuthClientId;
     this._oAuthClient = options.oAuthClient;
-    this._assertion = options.assertion;
     this._profileClient = options.profileClient;
     this._fxaClient = options.fxaClient;
     this._marketingEmailClient = options.marketingEmailClient;
     this._metrics = options.metrics;
     this._notifier = options.notifier;
     this._sentryMetrics = options.sentryMetrics;
-
-    /**
-       * Keeps track of outstanding assertion generation requests, keyed
-       * by sessionToken. Used to prevent multiple concurrent assertion
-       * requests for the same sessionToken.
-       */
-    this._assertionPromises = {};
 
     // upgrade old `grantedPermissions` to the new `permissions`.
     this._upgradeGrantedPermissions();
@@ -196,61 +188,34 @@ const Account = Backbone.Model.extend({
     return this.get('verified') && ! this.get('accessToken');
   },
 
-  /**
-     * Get an assertion that can be used to get an OAuth token
-     *
-     * @returns {Promise} resolves to the assertion
-     */
-  _generateAssertion () {
+  createOAuthToken (scope) {
     const sessionToken = this.get('sessionToken');
     if (! sessionToken) {
       return Promise.reject(AuthErrors.toError('INVALID_TOKEN'));
     }
 
-    const existingAssertionPromise = this._assertionPromises[sessionToken];
-
-    if (this._isAssertionValid(existingAssertionPromise)) {
-      return existingAssertionPromise;
-    }
-
-    const assertionPromise = this._assertion.generate(sessionToken);
-    // assertions live for about 6 hours.
-    // reuse the same assertion if created in the past hour
-    assertionPromise.__expiresAt = Date.now() + 1000 * 60 * 60;
-
-    this._assertionPromises[sessionToken] = assertionPromise;
-
-    return assertionPromise;
-  },
-
-  /**
-     * Check if the assertion promise result is still valid
-     *
-     * @param {Promise} assertionPromise
-     * @returns {Boolean}
-     */
-  _isAssertionValid (assertionPromise) {
-    return !! (assertionPromise &&
-              assertionPromise.__expiresAt &&
-              assertionPromise.__expiresAt >= Date.now());
-  },
-
-  createOAuthToken (scope) {
-    return this._generateAssertion()
-      .then((assertion) => {
-        const params = {
-          assertion: assertion,
-          client_id: this._oAuthClientId, //eslint-disable-line camelcase
-          scope: scope
-        };
-        return this._oAuthClient.getToken(params);
-      })
+    const params = {
+      access_type: 'online',//eslint-disable-line camelcase
+      client_id: this._oAuthClientId, //eslint-disable-line camelcase
+      grant_type: 'fxa-credentials', //eslint-disable-line camelcase
+      scope
+    };
+    return this._fxaClient.createOAuthToken(sessionToken, params)
       .then((result) => {
         return new OAuthToken({
           oAuthClient: this._oAuthClient,
           token: result.access_token
         });
       });
+  },
+
+  createOAuthCode (params) {
+    return this._fxaClient.createOAuthCode(this.get('sessionToken'), params);
+  },
+
+
+  getOAuthScopedKeyData(params) {
+    return this._fxaClient.getOAuthScopedKeyData(this.get('sessionToken'), params);
   },
 
   /**

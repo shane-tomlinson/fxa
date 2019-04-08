@@ -2005,6 +2005,38 @@ define([
       });
   };
 
+  FxAccountClient.prototype.createOAuthCode = function (sessionToken, params) {
+    var request = this.request;
+    return Promise.resolve()
+      .then(function () {
+        return hawkCredentials(sessionToken, 'sessionToken', HKDF_SIZE);
+      }).then(function (creds) {
+        return request.send('/oauth/authorization', 'POST', creds, params);
+      });
+  };
+
+  FxAccountClient.prototype.createOAuthToken = function (sessionToken, params) {
+    var request = this.request;
+    return Promise.resolve()
+      .then(function () {
+        return hawkCredentials(sessionToken, 'sessionToken', HKDF_SIZE);
+      }).then(function (creds) {
+        return request.send('/oauth/token', 'POST', creds, params);
+      });
+  };
+
+  FxAccountClient.prototype.getOAuthScopedKeyData = function (sessionToken, params) {
+    var request = this.request;
+    return Promise.resolve()
+      .then(function () {
+        return hawkCredentials(sessionToken, 'sessionToken', HKDF_SIZE);
+      }).then(function (creds) {
+        return request.send('/account/scoped-key-data', 'POST', creds, params);
+      });
+  };
+
+
+
   /**
    * Check for a required argument. Exposed for unit testing.
    *

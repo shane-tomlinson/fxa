@@ -82,8 +82,6 @@ module.exports = BaseAuthenticationBroker.extend({
     options = options || {};
 
     this.session = options.session;
-    this._assertionLibrary = options.assertionLibrary;
-    this._oAuthClient = options.oAuthClient;
     this._scopedKeys = ScopedKeys;
     this._metrics = options.metrics;
 
@@ -111,21 +109,17 @@ module.exports = BaseAuthenticationBroker.extend({
     if (! account || ! account.get('sessionToken')) {
       return Promise.reject(AuthErrors.toError('INVALID_TOKEN'));
     }
-    let assertion;
     const relier = this.relier;
     const clientId = relier.get('clientId');
-    return this._assertionLibrary.generate(account.get('sessionToken'), null, clientId)
-      .then((asser) => {
-        assertion = asser;
-
+    return Promise.resolve()
+      .then(() => {
         if (relier.wantsKeys()) {
-          return this._provisionScopedKeys(account, assertion);
+          return this._provisionScopedKeys(account);
         }
       })
       .then((keysJwe) => {
         const oauthParams = {
           acr_values: relier.get('acrValues'), //eslint-disable-line camelcase
-          assertion: assertion,
           client_id: clientId, //eslint-disable-line camelcase
           code_challenge: relier.get('codeChallenge'), //eslint-disable-line camelcase
           code_challenge_method: relier.get('codeChallengeMethod'), //eslint-disable-line camelcase
@@ -137,7 +131,7 @@ module.exports = BaseAuthenticationBroker.extend({
         if (relier.get('accessType') === Constants.ACCESS_TYPE_OFFLINE) {
           oauthParams.access_type = Constants.ACCESS_TYPE_OFFLINE; //eslint-disable-line camelcase
         }
-        return this._oAuthClient.getCode(oauthParams);
+        return account.createOAuthCode(oauthParams);
       })
       .then((response) => {
         if (! response) {
@@ -160,19 +154,17 @@ module.exports = BaseAuthenticationBroker.extend({
    * Derive scoped keys and encrypt them with the relier's public JWK
    *
    * @param {Object} account
-   * @param {String} assertion
    * @returns {Promise} Returns a promise that resolves into an encrypted bundle
    * @private
    */
-  _provisionScopedKeys (account, assertion) {
+  _provisionScopedKeys (account) {
     const relier = this.relier;
     const uid = account.get('uid');
 
     return Promise.resolve().then(() => {
       if (account.canFetchKeys()) {
         // check if requested scopes provide scoped keys
-        return this._oAuthClient.getClientKeyData({
-          assertion: assertion,
+        return account.getOAuthScopedKeyData({
           client_id: relier.get('clientId'), //eslint-disable-line camelcase
           scope: relier.get('scope')
         });

@@ -354,7 +354,8 @@ registerSuite('oauth signin', {
         .then(closeCurrentWindow())
 
         .then(testElementExists(selectors.SIGNIN_COMPLETE.HEADER))
-        .then(click(selectors.SIGNIN_COMPLETE.CONTINUE_BUTTON));
+        .then(click(selectors.SIGNIN_COMPLETE.CONTINUE_BUTTON))
+        .sleep(30000);
     },
 
 

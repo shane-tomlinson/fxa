@@ -6,7 +6,6 @@
 
 const Account = require('models/account');
 const { assert } = require('chai');
-const Assertion = require('lib/assertion');
 const AuthErrors = require('lib/auth-errors');
 const Constants = require('lib/constants');
 const OAuthClient = require('lib/oauth-client');
@@ -40,7 +39,6 @@ const VALID_OAUTH_CODE_REDIRECT_URL = `${REDIRECT_URI}?code=${VALID_OAUTH_CODE}&
 
 describe('models/auth_brokers/oauth-redirect', () => {
   var account;
-  var assertionLibrary;
   var broker;
   var metrics;
   var oAuthClient;
@@ -58,10 +56,6 @@ describe('models/auth_brokers/oauth-redirect', () => {
       });
     });
 
-    assertionLibrary = new Assertion({});
-    sinon.stub(assertionLibrary, 'generate').callsFake(function () {
-      return Promise.resolve('assertion');
-    });
     metrics = {
       flush: sinon.spy(() => Promise.resolve()),
       logEvent: () => {}
@@ -82,7 +76,6 @@ describe('models/auth_brokers/oauth-redirect', () => {
       sessionToken: 'abc123'
     });
     broker = new RedirectAuthenticationBroker({
-      assertionLibrary: assertionLibrary,
       metrics: metrics,
       oAuthClient: oAuthClient,
       relier: relier,
@@ -348,7 +341,6 @@ describe('models/auth_brokers/oauth-redirect', () => {
       });
 
       broker = new RedirectAuthenticationBroker({
-        assertionLibrary: assertionLibrary,
         metrics: metrics,
         oAuthClient: oAuthClient,
         relier: relier,
@@ -369,7 +361,6 @@ describe('models/auth_brokers/oauth-redirect', () => {
     it('gets an object with the OAuth login information', function () {
       return broker.getOAuthResult(account)
         .then(function (result) {
-          assert.isTrue(assertionLibrary.generate.calledWith(account.get('sessionToken'), null, 'clientId'));
           assert.equal(result.redirect, VALID_OAUTH_CODE_REDIRECT_URL);
           assert.equal(result.state, 'state');
           assert.equal(result.code, VALID_OAUTH_CODE);
@@ -391,18 +382,6 @@ describe('models/auth_brokers/oauth-redirect', () => {
           assert.equal(result.redirect, VALID_OAUTH_CODE_REDIRECT_URL);
           assert.equal(result.state, 'state');
           assert.equal(result.code, VALID_OAUTH_CODE);
-        });
-    });
-
-    it('passes on errors from assertion generation', function () {
-      assertionLibrary.generate.restore();
-      sinon.stub(assertionLibrary, 'generate').callsFake(function () {
-        return Promise.reject(new Error('uh oh'));
-      });
-
-      return broker.getOAuthResult(account)
-        .then(assert.fail, function (err) {
-          assert.equal(err.message, 'uh oh');
         });
     });
 
@@ -533,7 +512,6 @@ describe('models/auth_brokers/oauth-redirect', () => {
 
     beforeEach(() => {
       sinon.stub(broker._oAuthClient, 'getClientKeyData').callsFake((args) => {
-        assert.equal(args.assertion, 'assertion');
         assert.equal(args.client_id, 'clientId');
         assert.equal(args.scope, 'scope');
 
@@ -566,7 +544,7 @@ describe('models/auth_brokers/oauth-redirect', () => {
         return Promise.resolve('bundle');
       });
 
-      return broker._provisionScopedKeys(accountKey, 'assertion')
+      return broker._provisionScopedKeys(accountKey)
         .then((result) => {
           assert.isTrue(broker._scopedKeys.createEncryptedBundle.calledOnce);
           assert.equal(result, 'bundle');
@@ -576,7 +554,7 @@ describe('models/auth_brokers/oauth-redirect', () => {
     it('returns null if no unwrapBKey', () => {
       accountKey.set('unwrapBKey', null);
 
-      return broker._provisionScopedKeys(accountKey, 'assertion')
+      return broker._provisionScopedKeys(accountKey)
         .then((result) => {
           assert.equal(result, null);
         });

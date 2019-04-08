@@ -677,26 +677,6 @@ FxaClientWrapper.prototype = {
   }),
 
   /**
-   * Sign a BrowserID public key
-   *
-   * @param {Object} pubkey The key to sign
-   * @param {Number} duration Time interval from now when the certificate will expire in milliseconds
-   * @param {String} sessionToken User session token
-   * @param {String} [service=''] The requesting service, sent via the query string
-   * @return {Promise} resolves when complete
-   */
-  certificateSign: withClient((client, pubkey, duration, sessionToken, service) => {
-    return client.certificateSign(
-      sessionToken,
-      pubkey,
-      duration,
-      {
-        service: service || Constants.CONTENT_SERVER_SERVICE
-      }
-    );
-  }),
-
-  /**
    * Responds successfully if the session status is valid, requires the sessionToken.
    *
    * @param {String} sessionToken User session token
@@ -1127,8 +1107,41 @@ FxaClientWrapper.prototype = {
       .then(accountData => {
         return getUpdatedSessionData(email, relier, accountData);
       });
-  })
+  }),
 
+  getOAuthScopedKeyData: withClient((client, sessionToken, params) => {
+    return client.getOAuthScopedKeyData(sessionToken, params);
+  }),
+
+  /**
+   * Create an OAuth token using sessionToken.
+   *
+   * @param {String} sessionToken
+   * @param {Object} params
+   * @param {String} params.client_id
+   * @param {String} params.scope
+   * @param {String} params.response_type
+   * @param {String} [params.ttl]
+   * @returns {Promise}
+   */
+  createOAuthToken: withClient((client, sessionToken, params) => {
+    return client.createOAuthToken(sessionToken, params);
+  }),
+
+  /**
+   * Create an OAuth code using sessionToken
+   *
+   * @param {String} sessionToken
+   * @param {Object} params
+   * @param {String} params.client_id
+   * @param {String} params.redirect_uri
+   * @param {String} params.scope
+   * @param {String} params.state
+   * @returns {Promise}
+   */
+  createOAuthCode: withClient((client, sessionToken, params) => {
+    return client.createOAuthCode(sessionToken, params);
+  })
 };
 
 module.exports = FxaClientWrapper;
