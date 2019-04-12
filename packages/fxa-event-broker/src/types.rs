@@ -73,4 +73,5 @@ macro_rules! enum_boilerplate {
 
 pub mod env;
 pub mod error;
+pub mod event;
 pub mod validate;
