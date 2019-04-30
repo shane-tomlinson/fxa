@@ -467,18 +467,24 @@ const BaseAuthenticationBroker = Backbone.Model.extend({
         console.log('codeChallenge', codeChallenge);
         console.log('codeVerifier', codeVerifier);
 
-        // TODO, store state, code_verifier in a cookie instead of window.name
-        window.name = JSON.stringify({
-          // eslint-disable-next-line camelcase
-          code_verifier: codeVerifier,
-          state
-        });
-
-        return account.createOAuthCode(managementScopes, state, managementClientId, {
-          codeChallenge
-        });
+        return Promise.all([
+          account.createOAuthCode(managementScopes, state, managementClientId, {
+            codeChallenge
+          }),
+          fetch('/payments-pkce', {
+            body: JSON.stringify({
+              // eslint-disable-next-line camelcase
+              code_verifier: codeVerifier,
+              state
+            }),
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            method: 'POST',
+          }),
+        ]);
       })
-      .then(response => {
+      .then(([response]) => {
         return new NavigateBehavior(response.redirect, { server: true });
       });
   },
@@ -667,7 +673,6 @@ function codeVerifierToCodeChallenge(codeVerifier) {
   });
 }
 
-function base64UrlEncode(str) {
-  return btoa(str)
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/\=+$/, '');
+function base64UrlEncode (str) {
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/\=+$/, '');
 }
