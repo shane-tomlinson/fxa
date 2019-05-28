@@ -8,8 +8,25 @@ import DisableFormMixin from '../mixins/disable-form-mixin';
 import FormView from '../form';
 import SettingsPanelMixin from '../mixins/settings-panel-mixin';
 import Template from 'templates/settings/display_name.mustache';
+// eslint-disable-next-line
+import React from 'react';
+import ReactDOM from 'react-dom';
 
 const t = msg => msg;
+
+function InputComponent () {
+  return (
+    <input name="display_name" type="text" placeholder="Display name" />
+  );
+}
+function DisplayNameComponent() {
+  return (
+    <div>
+      This is a react rendered display name
+      <InputComponent />
+    </div>
+  );
+}
 
 const View = FormView.extend({
   template: Template,
@@ -31,6 +48,13 @@ const View = FormView.extend({
         this.user.setAccount(account);
         this._displayName = account.get('displayName');
       });
+  },
+
+  afterVisible () {
+    ReactDOM.render(
+      <DisplayNameComponent />,
+      this.$el.get(0)
+    );
   },
 
   isValidStart () {
