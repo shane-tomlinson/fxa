@@ -26,6 +26,7 @@ export default function(config = {}) {
 
   return {
     afterRender() {
+      console.log('pw strength balloon afterRender');
       return Promise.resolve().then(() => {
         if (!this.$(passwordEl).length) {
           // Only attach the balloon iff there is a password element. This avoids

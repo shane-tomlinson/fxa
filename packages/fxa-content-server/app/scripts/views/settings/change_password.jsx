@@ -28,6 +28,8 @@ function ChangePassword(props){
       <ChangePasswordForm
         account={props.account}
         submit={props.submit}
+        displayError={props.displayError}
+        isPanelOpen={props.isPanelOpen}
         showValidationError={props.showValidationError}
       />
     </div>
@@ -50,10 +52,11 @@ export class ChangePasswordForm extends React.Component{
     super(props);
 
     this.state = {
+      hasFocused: false,
       mail: props.account.get('email') || '',
       newPass: '',
       newVPass: '',
-      oldPass: ''
+      oldPass: '',
     };
   }
    getOldPassword = event => {
@@ -78,36 +81,50 @@ export class ChangePasswordForm extends React.Component{
      });
    }
    showValidationErrorsEnd () {
-     if (this.state.newPass !== this.state.newVPass) {
+     if (this.state.newVPass && this.state.newPass !== this.state.newVPass) {
        const err = AuthErrors.toError('PASSWORDS_DO_NOT_MATCH');
        this.props.showValidationError('#new_vpassword', err);
      }
    }
    componentDidUpdate () {
-     this._input.focus();
+     console.log('componentDidUpdate', this.state.hasFocused, this.props.isPanelOpen)
+     if (!this.state.hasFocused && this.props.isPanelOpen) {
+      this._input.focus();
+      this.setState({hasFocused: true});
+     }
    }
    componentWillUnmount () {
      return this.state.newPass === this.state.newVPass;
    }
+
+   setFocus = () => {
+     console.log('setFocus')
+     this.setState({
+       hasFocused: false
+     }, () => {
+       this.componentDidUpdate();
+     });
+   }
+
    handleSubmit = event => {
      event.preventDefault();
-     this.setState({
-       newPass: document.querySelectorAll('#new_password')[0].value,
-       newVPass: document.querySelectorAll('#new_vpassword')[0].value,
-       oldPass: document.querySelectorAll('#old_password')[0].value
-     }, () => {
-       if (this.state.newPass !== this.state.newVPass) {
-         const err = AuthErrors.toError('PASSWORDS_DO_NOT_MATCH');
-         this.props.showValidationError('#new_vpassword', err);
-       } else {
-         this.props.submit(this.state.oldPass, this.state.newPass).then(() => 
-         this.setState({newPass: '', newVPass: '', oldPass: ''}),
-         document.querySelectorAll('#new_password')[0].value = '',
-         document.querySelectorAll('#new_vpassword')[0].value = '',
-         document.querySelectorAll('#old_password')[0].value =''
-         );
+    if (this.state.newPass !== this.state.newVPass) {
+      const err = AuthErrors.toError('PASSWORDS_DO_NOT_MATCH');
+      this.props.showValidationError('#new_vpassword', err);
+    } else {
+      this.props.submit(this.state.oldPass, this.state.newPass)
+      .then(() => {
+        this.setState({newPass: '', newVPass: '', oldPass: '', hasFocused: false});
+      }, (err) => {
+        if (AuthErrors.is(err, 'INCORRECT_PASSWORD')) {
+          this.props.showValidationError('#old_password', err);
+        } else if (AuthErrors.is(err, 'PASSWORDS_MUST_BE_DIFFERENT')) {
+          this.props.showValidationError('#new_password', err);
+        } else {
+          this.props.displayError(err);
+        }
+      });
        }
-     });
    };
 
    render(){
@@ -130,6 +147,7 @@ export class ChangePasswordForm extends React.Component{
                placeholder={t('Old password')}
                onChange={this.getOldPassword}
                required pattern=".{8,}"
+               value={this.state.oldPass}
                ref={input => (this._input = input)}
              />
              <div className="input-help input-help-forgot-pw links centered"><a href="/reset_password" className="reset-password">{t('Forgot password?')}</a></div>
@@ -143,6 +161,7 @@ export class ChangePasswordForm extends React.Component{
                placeholder={t('New password')}
                required pattern=".{8,}"
                data-synchronize-show="true"
+               value={this.state.newPass}
                onChange={this.getNewPassword}
              />
              <div className="helper-balloon"></div>
@@ -156,13 +175,14 @@ export class ChangePasswordForm extends React.Component{
                placeholder={t('Re-enter password')}
                required pattern=".{8,}"
                data-synchronize-show="true"
+               value={this.state.newVPass}
                onChange={this.getNewVPassword}
              />
            </div>
 
            <div className="button-row">
              <button type="submit" className="settings-button primary-button">{t('Change')}</button>
-             <button className="settings-button secondary-button cancel">{t('Cancel')}</button>
+             <button className="settings-button secondary-button cancel" onClick={this.setFocus}>{t('Cancel')}</button>
            </div>
          </form>
        </div>
@@ -171,34 +191,44 @@ export class ChangePasswordForm extends React.Component{
 }
 
 /* Need FormView because some functions like showValidationError
- * is used here and to avoid same code multiple times we have 
+ * is used here and to avoid same code multiple times we have
  * extended the View from FormView */
 
 const View = FormView.extend({
-  template: '<div />',
   className: 'change-password',
   viewName: 'settings.change-password',
 
-  render () {
+  getAccount () {
+    return this.getSignedInAccount();
+  },
+
+  initialize (...args) {
+    FormView.prototype.initialize(...args);
+    this.listenTo(this.model, 'change', this.renderReactComponent);
+  },
+
+  renderReactComponent () {
+    console.log('rendering react component')
     return Promise.resolve(translator.fetch()).then(() => {
       ReactDOM.render(
         <ChangePassword
-          account={this.getSignedInAccount()}
+          account={this.getAccount()}
           submit={(oldPassword, newPassword)=>this.submit(oldPassword, newPassword)}
+          displayError={(err)=>this.displayError(err)}
+          isPanelOpen={this.isPanelOpen()}
           showValidationError={(id,err)=>this.showValidationError(this.$(id),err)}
         />,
         this.$el.get(0)
       );
-      return true;
     });
   },
 
   openPanel () {
     // force a re-render so that the input element is focused.
-    return this.render();
+    return this.renderReactComponent();
   },
 
-   /* It causes form submission multiple times so to avoid 
+   /* It causes form submission multiple times so to avoid
    * that we have overwritten the defination of onFormSubmit */
   onFormSubmit () {},
 
@@ -218,16 +248,7 @@ const View = FormView.extend({
     }).then(() => {
       this.displaySuccess(t('Password changed successfully'));
       this.navigate('settings');
-
-      return this.render();
-    }).catch((err) => {
-      if (AuthErrors.is(err, 'INCORRECT_PASSWORD')) {
-        return this.showValidationError(this.$('#old_password'), err);
-      } else if (AuthErrors.is(err, 'PASSWORDS_MUST_BE_DIFFERENT')) {
-        return this.showValidationError(this.$('#new_password'), err);
-      }
-      throw err;
-    })
+    });
   },
 });
 
