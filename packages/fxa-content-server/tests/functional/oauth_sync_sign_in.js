@@ -135,33 +135,6 @@ registerSuite('signin to Sync after OAuth', {
   },
 
   tests: {
-    'legacy Sync signin': function() {
-      return this.remote
-        .then(createUser(email, PASSWORD, { preVerified: true }))
-        .then(
-          openFxaFromRp('email-first', { header: selectors.ENTER_EMAIL.HEADER })
-        )
-        .then(fillOutEmailFirstSignIn(email, PASSWORD))
-        .then(testElementTextEquals(selectors['123DONE'].AUTHENTICATED, email))
-
-        .then(
-          openPage(SYNC_LEGACY_SIGNIN_URL, selectors.SIGNIN.HEADER, {
-            webChannelResponses: {
-              'fxaccounts:can_link_account': { ok: true },
-              'fxaccounts:fxa_status': {
-                capabilities: null,
-                signedInUser: null,
-              },
-            },
-          })
-        )
-        .then(testElementTextEquals(selectors.SIGNIN.EMAIL_NOT_EDITABLE, email))
-        .then(type(selectors.SIGNIN.PASSWORD, PASSWORD))
-        .then(click(selectors.SIGNIN.SUBMIT))
-
-        .then(testElementExists(selectors.CONFIRM_SIGNIN.HEADER));
-    },
-
     'email-first Sync signin': function() {
       return this.remote
         .then(createUser(email, PASSWORD, { preVerified: true }))
